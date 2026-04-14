@@ -117,7 +117,7 @@ end_date   = c2.date_input("End",   value=pd.Timestamp("2024-12-31"))
 rf_rate = st.sidebar.number_input("Risk-free rate (annual %)", 0.0, 25.0, 2.0, 0.1) / 100
 if st.sidebar.button("🚀 Run Analysis", type="primary", use_container_width=True):
     st.session_state.has_run = True
-run = st.session_state.get("has_run", False)e)
+run = st.session_state.get("has_run", False)
 
 with st.sidebar.expander("ℹ️ About & Methodology"):
     st.markdown("""
