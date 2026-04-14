@@ -115,7 +115,9 @@ c1, c2 = st.sidebar.columns(2)
 start_date = c1.date_input("Start", value=pd.Timestamp("2019-01-01"))
 end_date   = c2.date_input("End",   value=pd.Timestamp("2024-12-31"))
 rf_rate = st.sidebar.number_input("Risk-free rate (annual %)", 0.0, 25.0, 2.0, 0.1) / 100
-run = st.sidebar.button("🚀 Run Analysis", type="primary", use_container_width=True)
+if st.sidebar.button("🚀 Run Analysis", type="primary", use_container_width=True):
+    st.session_state.has_run = True
+run = st.session_state.get("has_run", False)e)
 
 with st.sidebar.expander("ℹ️ About & Methodology"):
     st.markdown("""
@@ -135,8 +137,9 @@ with st.sidebar.expander("ℹ️ About & Methodology"):
 
 st.title("📊 Interactive Portfolio Analytics")
 
-if not run:
-    st.info("👈 Configure your portfolio in the sidebar and click **Run Analysis**."); st.stop()
+if if not run:
+    st.session_state.has_run = False
+    st.info("👈 Configure your portfolio in the sidebar and click **Run Analysis**."); st.stop()); st.stop()
 
 tickers = list(dict.fromkeys(t.strip().upper() for t in ticker_raw.replace(";",",").split(",") if t.strip()))
 
