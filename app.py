@@ -81,8 +81,7 @@ def download_prices(tickers_tuple, start: str, end: str):
     data, bench, bench_ok = {}, None, True
     for t in list(tickers_tuple) + ["^GSPC"]:
         try:
-            raw = yf.download(t, start=start, end=end, auto_adjust=True,
-                  progress=False)
+            raw = yf.download(t, start=start, end=end, auto_adjust=True, progress=False)
             if raw.empty or len(raw) < 50:
                 bench_ok = bench_ok and t != "^GSPC"; continue
             close = raw["Close"]
@@ -99,10 +98,9 @@ def download_prices(tickers_tuple, start: str, end: str):
     if bad: return None, None, bad, bench_ok, None
 
     prices = prices.dropna()
-    warn = None
     if "^GSPC" in data:
         bench = data["^GSPC"].reindex(prices.index).ffill()
-    return prices, bench, [], bench_ok, warn
+    return prices, bench, [], bench_ok, None
 
 # ─── Sidebar inputs ───────────────────────────────────────────────────────────
 
@@ -115,6 +113,7 @@ c1, c2 = st.sidebar.columns(2)
 start_date = c1.date_input("Start", value=pd.Timestamp("2019-01-01"))
 end_date   = c2.date_input("End",   value=pd.Timestamp("2024-12-31"))
 rf_rate = st.sidebar.number_input("Risk-free rate (annual %)", 0.0, 25.0, 2.0, 0.1) / 100
+
 if st.sidebar.button("🚀 Run Analysis", type="primary", use_container_width=True):
     st.session_state.has_run = True
 run = st.session_state.get("has_run", False)
@@ -137,9 +136,10 @@ with st.sidebar.expander("ℹ️ About & Methodology"):
 
 st.title("📊 Interactive Portfolio Analytics")
 
-if if not run:
+if not run:
     st.session_state.has_run = False
-    st.info("👈 Configure your portfolio in the sidebar and click **Run Analysis**."); st.stop()); st.stop()
+    st.info("👈 Configure your portfolio in the sidebar and click **Run Analysis**.")
+    st.stop()
 
 tickers = list(dict.fromkeys(t.strip().upper() for t in ticker_raw.replace(";",",").split(",") if t.strip()))
 
@@ -195,7 +195,6 @@ if not tan_ok: st.warning("⚠️ Tangency optimization did not converge — res
 # ─── Shared UI helpers ────────────────────────────────────────────────────────
 
 def show_metrics(w: np.ndarray):
-    """Display 5 portfolio metrics in st.metric columns."""
     s = series_stats(returns @ w, rf_rate)
     cols = st.columns(5)
     for col, (k, v) in zip(cols, fmt(s).items()): col.metric(k, v)
@@ -228,7 +227,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("Exploratory Analysis")
 
-    # Summary stats table
     st.subheader("Summary Statistics")
     all_r = {**{t: returns[t] for t in assets}, **({"S&P 500": bench_r} if bench_r is not None else {})}
     rows = {}
@@ -241,7 +239,6 @@ with tab1:
 
     st.markdown("---")
 
-    # Cumulative wealth index
     st.subheader("Cumulative Wealth Index ($10,000 Initial Investment)")
     sel = st.multiselect("Assets to display:", assets, default=assets, key="wealth_ms")
     fig_w = go.Figure([wealth_trace(returns[t], t) for t in sel])
@@ -253,7 +250,6 @@ with tab1:
 
     st.markdown("---")
 
-    # Return distribution
     st.subheader("Return Distribution")
     d1, d2 = st.columns([1, 3])
     with d1:
@@ -286,7 +282,6 @@ with tab1:
 with tab2:
     st.header("Risk Analysis")
 
-    # Rolling volatility
     st.subheader("Rolling Annualized Volatility")
     rwin = st.select_slider("Window (trading days):", [30, 60, 90, 120], value=60)
     fig_rv = go.Figure([go.Scatter(x=returns[t].rolling(rwin).std().index,
@@ -299,7 +294,6 @@ with tab2:
 
     st.markdown("---")
 
-    # Drawdown
     st.subheader("Drawdown Analysis")
     dd_t = st.selectbox("Stock:", assets, key="dd_sel")
     dd_s = drawdown_series(returns[dd_t])
@@ -313,7 +307,6 @@ with tab2:
 
     st.markdown("---")
 
-    # Risk-adjusted metrics
     st.subheader("Risk-Adjusted Performance Metrics")
     st.caption(f"Risk-free rate: {rf_rate:.2%} annualized")
     all_r2 = {**{t: returns[t] for t in assets}, **({"S&P 500": bench_r} if bench_r is not None else {})}
@@ -324,7 +317,6 @@ with tab2:
 with tab3:
     st.header("Correlation & Covariance Analysis")
 
-    # Heatmap
     st.subheader("Pairwise Correlation Heatmap")
     corr = returns.corr()
     fig_hm = go.Figure(go.Heatmap(z=corr.values, x=assets, y=assets,
@@ -337,7 +329,6 @@ with tab3:
 
     st.markdown("---")
 
-    # Rolling correlation
     st.subheader("Rolling Pairwise Correlation")
     c1, c2, c3 = st.columns(3)
     sa = c1.selectbox("Stock A:", assets, index=0, key="rc_a")
@@ -350,22 +341,18 @@ with tab3:
                          xaxis_title="Date", yaxis_title="Correlation")
     st.plotly_chart(fig_rc, use_container_width=True)
 
-    # Covariance matrix
     with st.expander("📋 Show Annualized Covariance Matrix"):
         st.caption("Annualized covariance matrix (daily covariance × 252)")
-        st.dataframe((cov * 252).style.format("{:.6f}"),
-             use_container_width=True)
+        st.dataframe((cov * 252).style.format("{:.6f}"), use_container_width=True)
 
 # ════════════════════ TAB 4 – PORTFOLIO OPTIMIZATION ═════════════════════════
 with tab4:
     st.header("Portfolio Construction & Optimization")
 
-    # Equal-weight
     st.subheader("Equal-Weight (1/N) Portfolio")
     show_metrics(eq_w)
     st.markdown("---")
 
-    # GMV & Tangency
     st.subheader("Optimized Portfolios")
     lc, rc = st.columns(2)
     for col, label, w, color in [(lc, "Global Minimum Variance (GMV)", gmv_w, "steelblue"),
@@ -377,7 +364,6 @@ with tab4:
                             use_container_width=True)
     st.markdown("---")
 
-    # Risk contribution
     st.subheader("Risk Contribution Decomposition")
     st.info("**Percentage Risk Contribution (PRC):** each bar shows what fraction of total portfolio "
             "variance comes from each asset (sums to 100%). A stock with 10% weight but 25% PRC is a "
@@ -390,7 +376,6 @@ with tab4:
                      use_container_width=True)
     st.markdown("---")
 
-    # Custom portfolio
     st.subheader("Custom Portfolio Builder")
     st.markdown("Adjust the sliders — weights are **normalized** to sum to 100%.")
     scols = st.columns(min(n, 5))
@@ -404,7 +389,6 @@ with tab4:
     show_metrics(custom_w)
     st.markdown("---")
 
-    # Efficient frontier
     st.subheader("Efficient Frontier & Capital Allocation Line")
     st.markdown("The **efficient frontier** traces portfolios with maximum return per unit of risk. "
                 "The **Capital Allocation Line (CAL)** runs from the risk-free rate through the "
@@ -417,21 +401,15 @@ with tab4:
     if ef_v:
         fig_ef.add_trace(go.Scatter(x=ef_v, y=ef_r, mode="lines", name="Efficient Frontier",
                                     line=dict(color="navy", width=2.5)))
-
-    # Individual stocks
     for t in assets:
         fig_ef.add_trace(go.Scatter(x=[returns[t].std() * 252**0.5], y=[returns[t].mean() * 252],
                                     mode="markers+text", name=t, text=[t],
                                     textposition="top center", marker=dict(size=8)))
-
-    # Benchmark
     if bench_r is not None:
         fig_ef.add_trace(go.Scatter(x=[bench_r.std() * 252**0.5], y=[bench_r.mean() * 252],
                                     mode="markers+text", name="S&P 500", text=["S&P 500"],
                                     textposition="top center",
                                     marker=dict(size=11, symbol="square", color="black")))
-
-    # Named portfolios
     for pname, pw, pcolor, psym in [("Equal-Weight", eq_w, "green", "star"),
                                      ("GMV", gmv_w, "blue", "diamond"),
                                      ("Tangency", tan_w, "red", "triangle-up"),
@@ -442,8 +420,6 @@ with tab4:
                                     textposition="top center",
                                     marker=dict(size=14, symbol=psym, color=pcolor,
                                                 line=dict(width=1, color="black"))))
-
-    # CAL
     ts = series_stats(returns @ tan_w, rf_rate)
     if ts["vol"] > 0:
         slope_cal = (ts["ret"] - rf_rate) / ts["vol"]
@@ -451,14 +427,12 @@ with tab4:
         fig_ef.add_trace(go.Scatter(x=cal_v.tolist(), y=(rf_rate + slope_cal * cal_v).tolist(),
                                     mode="lines", name="Capital Allocation Line",
                                     line=dict(color="orange", width=2, dash="dash")))
-
     fig_ef.update_layout(title="Efficient Frontier with Capital Allocation Line",
                          xaxis_title="Annualized Volatility", yaxis_title="Annualized Return",
                          xaxis_tickformat=".0%", yaxis_tickformat=".0%", hovermode="closest")
     st.plotly_chart(fig_ef, use_container_width=True)
     st.markdown("---")
 
-    # Portfolio comparison
     st.subheader("Portfolio Comparison")
     all_ports = {"Equal-Weight": eq_w, "GMV": gmv_w, "Tangency": tan_w, "Custom": custom_w}
     port_colors = {"Equal-Weight": "green", "GMV": "blue", "Tangency": "red", "Custom": "purple"}
@@ -472,7 +446,6 @@ with tab4:
                           xaxis_title="Date", yaxis_title="Value ($)", hovermode="x unified")
     st.plotly_chart(fig_cmp, use_container_width=True)
 
-    # Summary table
     comp = {nm: fmt(series_stats(returns @ pw, rf_rate)) for nm, pw in all_ports.items()}
     if bench_r is not None:
         comp["S&P 500"] = fmt(series_stats(bench_r, rf_rate))
@@ -525,8 +498,7 @@ with tab5:
             st.subheader(f"{label} Portfolio Across Estimation Windows")
             st.dataframe(pd.DataFrame(tbl).T, use_container_width=True)
             fig_s = go.Figure([
-                go.Bar(name=wn,
-                       x=assets,
+                go.Bar(name=wn, x=assets,
                        y=[float(tbl[wn][a].strip("%")) / 100 for a in assets])
                 for wn in tbl])
             fig_s.update_layout(title=f"{label} Weights by Estimation Window",
